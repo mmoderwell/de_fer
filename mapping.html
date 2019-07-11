@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>Sub-Zero Testing</title>
+	<meta name="description" content="The HTML5 Herald">
+	<meta name="author" content="SitePoint">
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin="" />
+	<script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js" integrity="sha512-GffPMF3RvMeYyc1LWMHtK8EbPv0iNZ8/oTtHPx9/cc2ILxQ+u905qIwdpULaqDkyBKgOaB57QTMg7ztg8Jm2Og==" crossorigin=""></script>
+	<script src="./leaflet-providers.js"></script>
+	<style>
+	#mapid {
+		height: 97vh;
+		position: relative;
+	}
+
+	.info {
+		padding: 20px 18px;
+		border: 1.5px solid black;
+		font: 14px/16px Arial, Helvetica, sans-serif;
+		background: white;
+		box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+		border-radius: 2px;
+	}
+
+	.info h4 {
+		margin: 0 0 5px;
+		color: #777;
+	}
+	</style>
+</head>
+
+<body>
+	<div id="mapid"></div>
+	<br>
+	<script>
+	var mymap = L.map('mapid').setView([37.8, -96], 5);
+
+	L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+		maxZoom: 18,
+		id: 'mapbox.streets'
+	}).addTo(mymap);
+
+	L.tileLayer.provider('Stamen.Toner').addTo(mymap);
+
+	function zoomToFeature(e) {
+		mymap.fitBounds(e.target.getBounds());
+	}
+
+	function resetHighlight(e) {
+		geojson.resetStyle(e.target);
+	}
+
+	function highlightFeature(e) {
+		var layer = e.target;
+
+		layer.setStyle({
+			weight: 5,
+			color: '#666',
+			dashArray: '',
+			fillOpacity: 0.7
+		});
+	}
+
+	function onEachFeature(feature, layer) {
+		layer.on({
+			mouseover: highlightFeature,
+			mouseout: resetHighlight,
+			click: zoomToFeature
+		});
+	}
+	// converts a number, or number string, into abbreviated
+	// format. e.g. 300000 -> 300K
+	function abbreviateNumber(value) {
+		let newValue = Number(value);
+		const suffixes = ["", "K", "M", "B", "T"];
+		let suffixNum = 0;
+		while (newValue >= 1000) {
+			newValue /= 1000;
+			suffixNum++;
+		}
+		newValue = newValue.toPrecision(3);
+		newValue += suffixes[suffixNum];
+		return newValue;
+	}
+
+	var info = L.control();
+
+	info.onAdd = function (map) {
+		this._div = L.DomUtil.create('div', 'info'); // create a div with a class "info"
+		this.update();
+		return this._div;
+	};
+
+	// method that we will use to update the control based on feature properties passed
+	info.update = function (props) {
+		this._div.innerHTML =
+			'<h4>Refrigerator Market Share</h4>' + (props ?
+				`<b> ${props.county}, ${props.state} </b><br/> ${Number(props.market_share).toFixed(5)}% share.
+			<br>${abbreviateNumber((Number(props.market_share) * 12000000).toFixed(3))} units sold
+			<br>
+			<br> Population: ${props.population}
+			<br> Median Income: ${props.median_income}
+			<br> Households: ${props.households}
+			<br> Density by Pop: ${props.density_by_population}` :
+				'Hover over a county');
+	};
+
+	info.addTo(mymap);
+
+	function highlightFeature(e) {
+		info.update(e.target.feature.geometry);
+	}
+
+	function resetHighlight(e) {
+		info.update();
+	}
+
+
+	var dataReq = new XMLHttpRequest();
+	dataReq.addEventListener("load", resListener);
+	dataReq.open("GET", "http://localhost:8080/");
+	dataReq.send();
+	// map and process the county data from the backend
+	function resListener() {
+		let data = JSON.parse(this.responseText);
+		const num_household = 137680980;
+
+		const min = -0.000009;
+		const max = 0.085;
+		const len = max - min;
+		const size = len / 4;
+
+		function colorizer(share) {
+			let val = Number(share) * 100;
+
+			if (val <= min + (size * 1)) {
+				return "#EDF2F4";
+			} else if (val <= min + (size * 2)) {
+				return "#9AADBF";
+			} else if (val <= min + (size * 3)) {
+				return "#FFA69E";
+			} else if (val <= min + (size * 4)) {
+				return "#FFB997";
+			} else {
+				return "#EE7674";
+			}
+		}
+
+		data.forEach((el) => {
+			let county = JSON.parse(el["geo_json"]);
+			if (county == -1) {
+				return;
+			}
+			let data = { ...county,
+				...{
+					"market_share": el["market_share"],
+					"county": el["county"],
+					"state": el["state"],
+					"households": el["num_households"],
+					"population": el["population_july18"],
+					"median_income": el["median_household_income_2017"],
+					"density_by_population": el["density_by_population"]
+				}
+			};
+			L.geoJSON(data, {
+				// style: () => {
+				// 	if (el["population_july18"] > 100000) {
+				// 		return { color: "#E09194" };
+				// 	} else {
+				// 		return { color: "#9393CD" };
+				// 	}
+				// }
+				// style: () => {
+				// 	if (el["population_july18"] > 100000 && el["median_household_income_2017"] > 60000) {
+				// 		return { color: "#E09194" };
+				// 	} else {
+				// 		return { color: "#9393CD" };
+				// 	}
+				// }
+				// style: () => {
+				// 	if (el["total_new_homes"] > 700 && el["median_value_per_sq_foot_may19"] > 90) {
+				// 		return { color: "#E09194" };
+				// 	} else {
+				// 		return { color: "#9393CD" };
+				// 	}
+				// }
+				onEachFeature: onEachFeature,
+				style: () => {
+					return { color: colorizer(el.market_share) };
+				}
+			}).addTo(mymap);
+		});
+	}
+	</script>
+</body>
+
+</html>
