@@ -14,6 +14,7 @@ Before you can visualize any data, you'll need to:
       $ cd de_fer/backend
       
 From the `/backend` folder, run
+
       $ node subzero.js
 
 Launch mapping.html in a browser and you should see a map of all the U.S counties and their respective market shares.
@@ -31,10 +32,7 @@ This project is licensed under the MIT License; go ahead and do whatever you lik
 ## Inspiration
 
 I wanted an easy way to visualize different county level data for a market share project. 
-I had a bunch of data points for each county in the us but it was hard for me to make sense of them
-and how they compared to the rest of the country. With this tool, I'm able to quickly look at each metric,
-or a combination on more than one, and compare the values with the rest.
+I had a bunch of data points for each county in the us but it was hard for me to make sense of them and how they compared to the rest of the country. With this tool, I'm able to quickly look at each metric, or a combination on more than one, and compare the values with the rest.
 
 While the end goal of this data is to run it through some machine learning models, being able to visually see the data
-before then gives a better understanding of the data we are working with and hopefully gives more direction when 
-tuning things later on.
+before then gives a better understanding of the data we are working with and hopefully gives more direction when tuning things later on.
